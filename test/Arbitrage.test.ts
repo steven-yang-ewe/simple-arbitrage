@@ -22,7 +22,7 @@ describe('Arbitrage', function() {
     groupedWethMarkets[0].setReservesViaOrderedBalances([ETHER, ETHER.mul(2)])
     groupedWethMarkets[1].setReservesViaOrderedBalances([ETHER, ETHER])
 
-    const bestCrossedMarket = getBestCrossedMarket([groupedWethMarkets], TOKEN_ADDRESS);
+    const bestCrossedMarket = getBestCrossedMarket([groupedWethMarkets], TOKEN_ADDRESS, true);
     if (bestCrossedMarket === undefined) {
       fail("No crossed Market")
       return
@@ -34,7 +34,7 @@ describe('Arbitrage', function() {
     groupedWethMarkets[0].setReservesViaOrderedBalances([ETHER, ETHER])
     groupedWethMarkets[1].setReservesViaOrderedBalances([ETHER, ETHER])
 
-    const bestCrossedMarket = getBestCrossedMarket([groupedWethMarkets], TOKEN_ADDRESS);
+    const bestCrossedMarket = getBestCrossedMarket([groupedWethMarkets], TOKEN_ADDRESS, true);
     if (bestCrossedMarket === undefined) {
       fail("No crossed Market")
       return

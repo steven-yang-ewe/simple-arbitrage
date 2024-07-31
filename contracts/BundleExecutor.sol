@@ -52,7 +52,7 @@ contract FlashBotsMultiCall {
     receive() external payable {
     }
 
-    function uniswapWeth(uint256 _wethAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads) external onlyExecutor payable {
+    function uniswapWeth(uint256 _wethAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads, bool checkGain) external onlyExecutor payable {
         require (_targets.length == _payloads.length);
         uint256 _wethBalanceBefore = WETH.balanceOf(address(this));
         WETH.transfer(_targets[0], _wethAmountToFirstMarket);
@@ -62,7 +62,9 @@ contract FlashBotsMultiCall {
         }
 
         uint256 _wethBalanceAfter = WETH.balanceOf(address(this));
-        require(_wethBalanceAfter > _wethBalanceBefore + _ethAmountToCoinbase);
+        if(checkGain) {
+            require(_wethBalanceAfter > _wethBalanceBefore + _ethAmountToCoinbase);
+        }
         if (_ethAmountToCoinbase == 0) return;
 
         uint256 _ethBalance = address(this).balance;

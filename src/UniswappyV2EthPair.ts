@@ -5,9 +5,10 @@ import { UNISWAP_LOOKUP_CONTRACT_ADDRESS, WETH_ADDRESS } from "./addresses";
 import { CallDetails, EthMarket, MultipleCallData, TokenBalances } from "./EthMarket";
 import { ETHER } from "./utils";
 import { MarketsByToken } from "./Arbitrage";
+import { readFileSync, writeFileSync } from "fs";
 
 // batch count limit helpful for testing, loading entire set of uniswap markets takes a long time to load
-const BATCH_COUNT_LIMIT = 100;
+const BATCH_COUNT_LIMIT = 200;
 const UNISWAP_BATCH_SIZE = 1000
 
 // Not necessary, slightly speeds up loading initialization when we know tokens are bad
@@ -45,12 +46,44 @@ export class UniswappyV2EthPair extends EthMarket {
     return []
   }
 
+  static async loadFile(factoryAddress: string): Promise<Array<UniswappyV2EthPair>> {
+
+    let pairs = new Array<UniswappyV2EthPair>();
+    try {
+      const dataStr = readFileSync("./" + factoryAddress + ".json");
+
+      const pairData = JSON.parse(dataStr.toString());
+
+      pairs = _.map(pairData, p => new UniswappyV2EthPair(p.marketAddress, p.tokens, ""));
+    } catch (e) {
+      console.log(e);
+    }
+    return pairs;
+  }
+
+  static async writeFile(factoryAddress: string, data: Array<Record<string, unknown>>): Promise<void> {
+    try {
+      writeFileSync("./" + factoryAddress + ".json", JSON.stringify(data, null, 2));
+    } catch (e) {
+      console.log("failed to write file, ", factoryAddress );
+      console.log(e);
+    }
+  }
+
   static async getUniswappyMarkets(provider: providers.JsonRpcProvider, factoryAddress: string): Promise<Array<UniswappyV2EthPair>> {
     const uniswapQuery = new Contract(UNISWAP_LOOKUP_CONTRACT_ADDRESS, UNISWAP_QUERY_ABI, provider);
 
-    const marketPairs = new Array<UniswappyV2EthPair>()
+    const scannedPair = await this.loadFile(factoryAddress);
+
+    if (scannedPair.length > 0) {
+      return scannedPair;
+    }
+
+    const marketPairs = new Array<UniswappyV2EthPair>();
+    const pairData: Array<Record<string, unknown>> = [];
     for (let i = 0; i < BATCH_COUNT_LIMIT * UNISWAP_BATCH_SIZE; i += UNISWAP_BATCH_SIZE) {
       const pairs: Array<Array<string>> = (await uniswapQuery.functions.getPairsByIndexRange(factoryAddress, i, i + UNISWAP_BATCH_SIZE))[0];
+
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i];
         const marketAddress = pair[2];
@@ -63,16 +96,25 @@ export class UniswappyV2EthPair extends EthMarket {
         } else {
           continue;
         }
+
         if (!blacklistTokens.includes(tokenAddress)) {
           const uniswappyV2EthPair = new UniswappyV2EthPair(marketAddress, [pair[0], pair[1]], "");
           marketPairs.push(uniswappyV2EthPair);
+          pairData.push({"marketAddress": marketAddress, "tokens": [pair[0], pair[1]]});
         }
       }
       if (pairs.length < UNISWAP_BATCH_SIZE) {
         break
       }
+
+     // await new Promise(f => setTimeout(f, 1000));
     }
 
+    console.log("size of all pairs: ", marketPairs.length)
+
+
+    await this.writeFile(factoryAddress, pairData);
+    // console.log("all eth pairs: ", marketPairs)
     return marketPairs
   }
 
@@ -116,6 +158,7 @@ export class UniswappyV2EthPair extends EthMarket {
       const reserve = reserves[i]
       marketPair.setReservesViaOrderedBalances([reserve[0], reserve[1]])
     }
+    // console.log("market pairs:", JSON.stringify(allMarketPairs))
   }
 
   getBalance(tokenAddress: string): BigNumber {
